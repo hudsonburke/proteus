@@ -48,8 +48,8 @@ class TestInvoluteToothProfile:
 class TestSpurGearPlan:
     """Test SpurGearPlan class."""
 
-    @pytest.mark.xfail(reason="Gear plan uses bd.Sketch(Face) which fails in build123d 0.10")
     def test_creation(self):
+
         """Test basic gear plan creation."""
         plan = SpurGearPlan(
             module=1,
@@ -60,8 +60,8 @@ class TestSpurGearPlan:
         assert plan.geom is not None
         assert len(plan.geom.faces()) > 0
 
-    @pytest.mark.xfail(reason="Gear plan uses bd.Sketch(Face) which fails in build123d 0.10")
     def test_face_normal(self):
+
         """Test face normal points up."""
         plan = SpurGearPlan(
             module=1,
@@ -78,8 +78,8 @@ class TestSpurGearPlan:
 class TestSpurGear:
     """Test SpurGear class."""
 
-    @pytest.mark.xfail(reason="Gear plan uses bd.Sketch(Face) which fails in build123d 0.10")
     def test_creation(self):
+
         """Test basic gear creation."""
         gear = SpurGear(
             module=2,
@@ -91,8 +91,8 @@ class TestSpurGear:
         assert gear.geom is not None
         assert gear.geom.volume > 0
 
-    @pytest.mark.xfail(reason="Gear plan uses bd.Sketch(Face) which fails in build123d 0.10")
     def test_bounding_box(self):
+
         """Test bounding box size."""
         module = 2
         tooth_count = 12

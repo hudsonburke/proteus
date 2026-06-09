@@ -28,20 +28,47 @@ from ..common import BasePart
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 # Imperial number-size → diameter in inches
-_IMPERIAL_NUMBERED: dict[str, float] = {
-    "#0000": 0.0210,
-    "#000": 0.0340,
-    "#00": 0.0470,
-    "#0": 0.0600,
-    "#1": 0.0730,
-    "#2": 0.0860,
-    "#3": 0.0990,
-    "#4": 0.1120,
-    "#5": 0.1250,
-    "#6": 0.1380,
-    "#8": 0.1640,
-    "#10": 0.1900,
-    "#12": 0.2160,
+# Number drill sizes → diameter in inches
+_NUMBER_DRILL_SIZES: dict[str, float] = {
+    "#0000": 0.0210, "#000": 0.0340, "#00": 0.0470,
+    "#0": 0.0600, "#1": 0.0730, "#2": 0.0860,
+    "#3": 0.0990, "#4": 0.1120, "#5": 0.1250,
+    "#6": 0.1380, "#7": 0.1510, "#8": 0.1640,
+    "#9": 0.1770, "#10": 0.1900, "#11": 0.2030,
+    "#12": 0.2160, "#13": 0.2210, "#14": 0.2280,
+    "#15": 0.2340, "#16": 0.2460, "#17": 0.2570,
+    "#18": 0.2650, "#19": 0.2720, "#20": 0.2770,
+    "#21": 0.2820, "#22": 0.2870, "#23": 0.2900,
+    "#24": 0.2950, "#25": 0.3020, "#26": 0.3070,
+    "#27": 0.3160, "#28": 0.3230, "#29": 0.3300,
+    "#30": 0.3360, "#31": 0.3440, "#32": 0.3540,
+    "#33": 0.3620, "#34": 0.3680, "#35": 0.3770,
+    "#36": 0.3840, "#37": 0.3970, "#38": 0.4040,
+    "#39": 0.4100, "#40": 0.4200, "#41": 0.4280,
+    "#42": 0.4360, "#43": 0.4380, "#44": 0.4440,
+    "#45": 0.4530, "#46": 0.4600, "#47": 0.4680,
+    "#48": 0.4760, "#49": 0.4840, "#50": 0.5000,
+    "#51": 0.5160, "#52": 0.5310, "#53": 0.5460,
+    "#54": 0.5630, "#55": 0.5780, "#56": 0.5940,
+    "#57": 0.6090, "#58": 0.6250, "#59": 0.6410,
+    "#60": 0.6560, "#61": 0.6720, "#62": 0.6880,
+    "#63": 0.7030, "#64": 0.7190, "#65": 0.7340,
+    "#66": 0.7500, "#67": 0.7660, "#68": 0.7810,
+    "#69": 0.7970, "#70": 0.8120, "#71": 0.8280,
+    "#72": 0.8440, "#73": 0.8590, "#74": 0.8750,
+    "#75": 0.8910, "#76": 0.9060, "#77": 0.9220,
+    "#78": 0.9380, "#79": 0.9530, "#80": 0.9690,
+}
+
+# Letter drill sizes → diameter in inches
+_LETTER_DRILL_SIZES: dict[str, float] = {
+    "A": 0.2340, "B": 0.2380, "C": 0.2420, "D": 0.2460,
+    "E": 0.2500, "F": 0.2570, "G": 0.2610, "H": 0.2660,
+    "I": 0.2720, "J": 0.2770, "K": 0.2810, "L": 0.2900,
+    "M": 0.2950, "N": 0.3020, "O": 0.3160, "P": 0.3230,
+    "Q": 0.3320, "R": 0.3390, "S": 0.3480, "T": 0.3580,
+    "U": 0.3680, "V": 0.3770, "W": 0.3860, "X": 0.3970,
+    "Y": 0.4040, "Z": 0.4130,
 }
 
 def _metric_str_to_float(s: str) -> float:
@@ -63,13 +90,16 @@ def _metric_str_to_float(s: str) -> float:
             return float("nan")
     return float("nan")
 
+
 def _imperial_str_to_float(s: str) -> float:
     """Convert an imperial size string to a float (inches)."""
     s = s.strip()
     if s in ("–", "—", ""):
         return float("nan")
     if s.startswith("#"):
-        return _IMPERIAL_NUMBERED[s]
+        return _NUMBER_DRILL_SIZES.get(s, float("nan"))
+    if s in _LETTER_DRILL_SIZES:
+        return _LETTER_DRILL_SIZES[s]
     parts = s.replace('"', "").split()
     total = 0.0
     for p in parts:
@@ -79,7 +109,6 @@ def _imperial_str_to_float(s: str) -> float:
         else:
             total += float(p)
     return total
-
 
 def _read_csv(filename: str) -> dict[str, dict[str, str]]:
     """Read a parameter CSV and return {Size: {TYPE:param: value, ...}}."""
@@ -118,6 +147,23 @@ def _evaluate_params(
     """Convert string parameter values to floats."""
     converter = _metric_str_to_float if is_metric else _imperial_str_to_float
     return {k: converter(v) for k, v in params.items()}
+
+
+def _lookup_drill_diameters(
+    drill_hole_sizes: dict[str, dict[str, str]]
+) -> dict[str, dict[str, float]]:
+    """Map drill size names to actual diameters for clearance/tap hole tables."""
+    drill_hole_diameters: dict[str, dict[str, float]] = {}
+    for size, fits in drill_hole_sizes.items():
+        drill_hole_diameters[size] = {}
+        for fit, drill_size in fits.items():
+            if fit == "Size":
+                continue
+            try:
+                drill_hole_diameters[size][fit] = float(drill_size)
+            except ValueError:
+                drill_hole_diameters[size][fit] = _imperial_str_to_float(drill_size)
+    return drill_hole_diameters
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +245,40 @@ class Bearing(BasePart, ABC):
     @property
     def roller_count(self) -> int:
         return int(1.8 * math.pi * self.race_center_radius / self.roller_diameter)
+
+    def method_exists(self, method: str) -> bool:
+        """Return True if the derived class defines *method*."""
+        return hasattr(self.__class__, method) and callable(
+            getattr(self.__class__, method, None)
+        )
+
+    @property
+    def info(self) -> str:
+        """Return identifying information."""
+        return f"{self.bearing_class}({self.bearing_type}): {self.size}"
+
+    @property
+    def bearing_class(self) -> str:
+        """Name of the derived class that created this bearing."""
+        return type(self).__name__
+
+    @property
+    def clearance_hole_diameters(self) -> dict[str, float]:
+        """Drill diameters for clearance holes (Close, Normal, Loose fits)."""
+        sizes = _read_csv("clearance_hole_sizes.csv")
+        data = _lookup_drill_diameters(sizes)
+        size_prefix = self.size.split("-")[0]
+        try:
+            return data[size_prefix]
+        except KeyError as e:
+            raise ValueError(
+                f"No clearance hole data for size {self.bore_diameter}"
+            ) from e
+
+    @property
+    def capped(self) -> bool:
+        """Return True if this bearing type has caps/shields."""
+        return self.method_exists("_make_cap") and type(self)._make_cap is not Bearing._make_cap
 
     # ------------------------------------------------------------------
     # Abstract geometry sections — subclasses must provide

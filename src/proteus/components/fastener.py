@@ -73,7 +73,12 @@ from build123d import (
     PolarLocations,
     Polyline,
     Pos,
-    RadiusArc,
+    Plane,
+    PolarLine,
+    PolarLocations,
+    Polyline,
+    Polygon,
+    Pos,
     Rectangle,
     RegularPolygon,
     RigidJoint,
@@ -92,6 +97,8 @@ from build123d import (
     revolve,
     split,
 )
+
+from pydantic import Field
 
 from proteus.common import BasePart
 
@@ -133,7 +140,7 @@ def read_fastener_parameters_from_csv(filename: str) -> dict[str, dict[str, str]
                 continue
             row_data: dict[str, str] = {}
             for column, value in zip(column_headers[1:], row[1:]):
-                row_data[column] = value.strip()
+                row_data[column.strip()] = value.strip()
             parameters[row[0].strip()] = row_data
     return parameters
 
@@ -157,15 +164,25 @@ def decode_imperial_size(size: str) -> tuple[float, float]:
     return (diameter, pitch)
 
 
-def metric_str_to_float(measure: str) -> float:
-    """Convert a metric measurement string to float, stripping trailing units."""
+def metric_str_to_float(measure: str) -> float | str:
+    """Convert a metric measurement string to float or str, stripping trailing units.
+
+    Returns the original string for non-numeric values (e.g., drill sizes like '#21').
+    """
+    measure = measure.strip()
+    if not measure:
+        return 0.0
     result: float | None = None
     for i, c in enumerate(measure):
         if not (c.isdigit() or c in (".", "-")):
-            result = float(measure[:i])
+            if i > 0:
+                result = float(measure[:i])
             break
     if result is None:
-        result = float(measure)
+        try:
+            result = float(measure)
+        except ValueError:
+            return measure
     return result
 
 
@@ -262,10 +279,19 @@ def is_safe(value: str) -> bool:
 
 
 def imperial_str_to_float(measure: str) -> float:
-    """Convert an imperial measurement string (possibly a fraction) to float."""
-    if not measure:
-        return 0.0
+    """Convert an imperial measurement string (possibly a fraction) to float.
+
+    Handles number/letter drill sizes by looking them up in drill_sizes.csv.
+    """
     measure = measure.strip()
+    if measure in ("–", "—", ""):
+        return float("nan")
+
+    # Handle drill sizes (e.g., "#51", "B")
+    drill_sizes = read_drill_sizes()
+    if measure in drill_sizes:
+        return drill_sizes[measure]
+
     if "/" in measure:
         parts = measure.split()
         if len(parts) == 2 and is_safe(parts[0]) and is_safe(parts[1]):
@@ -411,20 +437,31 @@ class Nut(BasePart, ABC):
         size: standard size, e.g. ``"M6-1"`` or ``"1/4-20"``.
         fastener_type: type identifier, e.g. ``"iso4032"``.
         hand: thread direction — ``"right"`` (default) or ``"left"``.
-        simple: if ``True`` (default), omit helical thread geometry.
-
-    Raises:
-        ValueError: invalid *size*, *fastener_type*, or *hand*.
     """
+    # ── Pydantic fields (required by __init__) ──────────────────────
+
+    _nut_size: str = ""
+    _thread_size: str = ""
+    _length_size: str = ""
+    _is_metric: bool = True
+    _thread_diameter: float = 0.0
+    _thread_pitch: float = 0.0
+    _fastener_type: str = ""
+    _hand: str = "right"
+    _simple: bool = True
+    socket_clearance: float = 6.0
+    nut_data: dict = Field(default_factory=dict)
+    hole_locations: list = Field(default_factory=list)
+    label: str = ""
+    color: object = None
+
 
     # ── class-level CSV-derived data ────────────────────────────────
     fastener_data: ClassVar[dict[str, dict[str, str]]]
-
     clearance_hole_drill_sizes: ClassVar[dict] = {}
     clearance_hole_data: ClassVar[dict] = {}
     tap_hole_drill_sizes: ClassVar[dict] = {}
     tap_hole_data: ClassVar[dict] = {}
-
     @classmethod
     def _load_hole_tables(cls) -> None:
         """One-time load of clearance / tap hole CSV tables (cached on the class)."""
@@ -579,55 +616,64 @@ class Nut(BasePart, ABC):
 
     def __init__(
         self,
-        size: str,
-        fastener_type: str,
+        size: str = "",
+        fastener_type: str = "",
         hand: Literal["right", "left"] = "right",
         simple: bool = True,
+        nut_data: dict | None = None,
+        hole_locations: list | None = None,
     ):
         self._load_hole_tables()
 
-        self._nut_size = size.strip()
+        _nut_size = size.strip()
         (
-            self._thread_size,
-            self._length_size,
-            self._is_metric,
-            self._thread_diameter,
-            self._thread_pitch,
-        ) = _parse_size(self._nut_size)
+            _thread_size,
+            _length_size,
+            _is_metric,
+            _thread_diameter,
+            _thread_pitch,
+        ) = _parse_size(_nut_size)
 
         if fastener_type not in self.types():
             raise ValueError(
                 f"{fastener_type} invalid, must be one of {self.types()}"
             )
-        self._fastener_type = fastener_type
 
         if hand not in ("right", "left"):
             raise ValueError(f"{hand} invalid, must be one of 'right' or 'left'")
-        self._hand: Literal["right", "left"] = hand
-
-        self._simple = simple
-        self.socket_clearance = 6.0  # mm extra for socket wrench
 
         # Resolve nut dimensions from CSV
-        isolated = isolate_fastener_type(self._fastener_type, self.fastener_data)
-        if self._nut_size not in isolated:
+        isolated = isolate_fastener_type(fastener_type, self.fastener_data)
+        if _nut_size not in isolated:
             raise ValueError(
-                f"{size!r} invalid, must be one of {self.sizes(self._fastener_type)}"
+                f"{size!r} invalid, must be one of {self.sizes(fastener_type)}"
             )
-        self.nut_data = evaluate_parameter_dict(
-            isolated[self._nut_size], is_metric=self._is_metric
+        nut_data_computed = evaluate_parameter_dict(
+            isolated[_nut_size], is_metric=_is_metric
         )
 
-        # hole location tracking (for Builder integration later)
-        self.hole_locations: list[Location] = []
+        super().__init__(
+            nut_data=nut_data_computed if nut_data is None else nut_data,
+            hole_locations=hole_locations if hole_locations is not None else [],
+        )
+        object.__setattr__(self, "_nut_size", _nut_size)
+        object.__setattr__(self, "_thread_size", _thread_size)
+        object.__setattr__(self, "_length_size", _length_size)
+        object.__setattr__(self, "_is_metric", _is_metric)
+        object.__setattr__(self, "_thread_diameter", _thread_diameter)
+        object.__setattr__(self, "_thread_pitch", _thread_pitch)
+        object.__setattr__(self, "_fastener_type", fastener_type)
+        object.__setattr__(self, "_hand", hand)
+        object.__setattr__(self, "_simple", simple)
+        object.__setattr__(self, "socket_clearance", 6.0)
+        self._build_geometry()
 
-        super().__init__()
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
 
     def _build_geometry(self) -> None:
-        if method_exists(self.__class__, "custom_make"):
-            bd_object = self.custom_make()  # type: ignore[attr-defined]
-        else:
-            bd_object = self._make_nut()
+        bd_object = self._make_nut()
 
         if isinstance(bd_object, Compound) and len(bd_object.solids()) == 1:
             self.geom = bd_object.solid()
@@ -637,10 +683,10 @@ class Nut(BasePart, ABC):
         # Tagging
         self.label = f"{self.__class__.__name__}({self._nut_size}, {self._fastener_type})"
         self.color = Color(0xC0C0C0)
-
         # Standard joints
-        RigidJoint("a", self, Location())
-        RigidJoint("b", self, Pos(Z=self.nut_thickness))
+        self.joints["a"] = RigidJoint("a", self.geom, Location())
+        self.joints["b"] = RigidJoint("b", self.geom, Pos(Z=self.nut_thickness))
+
 
     def _make_nut(self) -> Solid | Compound:
         """Create nut geometry from profile + plan."""
@@ -737,13 +783,6 @@ class HeatSetNut(Nut):
     fastener_data: ClassVar[dict] = read_fastener_parameters_from_csv(
         "heatset_nut_parameters.csv"
     )
-
-    @property
-    def nut_diameter(self) -> float:
-        return float(
-            self.fastener_data[self._nut_size][self._fastener_type + ":s"]
-        )
-
     def __init__(
         self,
         size: str,
@@ -755,47 +794,63 @@ class HeatSetNut(Nut):
     ):
         self._load_hole_tables()
 
-        self._nut_size = size.strip()
+        _nut_size = size.strip()
         # HeatSet sizes include a length suffix: "M5-0.8-Standard"
-        parts = self._nut_size.split("-")
+        parts = _nut_size.split("-")
         thread_size = "-".join(parts[:2])
         (
-            self._thread_size,
-            self._length_size,
-            self._is_metric,
-            self._thread_diameter,
-            self._thread_pitch,
+            _thread_size,
+            _length_size,
+            _is_metric,
+            _thread_diameter,
+            _thread_pitch,
         ) = _parse_size(thread_size)
 
         if fastener_type not in self.types():
             raise ValueError(
                 f"{fastener_type} invalid, must be one of {self.types()}"
             )
-        self._fastener_type = fastener_type
 
         if hand not in ("right", "left"):
             raise ValueError(f"{hand} invalid, must be one of 'right' or 'left'")
-        self._hand = hand
-
-        self._simple = simple
-        self.socket_clearance = 6.0
-        self.hole_locations: list[Location] = []
 
         # Resolve data — HeatSet keys use the full size (with length suffix)
-        if self._nut_size not in self.fastener_data:
+        if _nut_size not in self.fastener_data:
             raise ValueError(
                 f"{size!r} invalid, must be one of {list(self.fastener_data.keys())}"
             )
-        raw = self.fastener_data[self._nut_size]
+        raw = self.fastener_data[_nut_size]
         nut_data_raw: dict[str, str] = {}
         for key, value in raw.items():
-            if key.startswith(self._fastener_type + ":"):
+            if key.startswith(fastener_type + ":"):
                 param = key.split(":", 1)[1]
                 nut_data_raw[param] = value
-        self.nut_data = evaluate_parameter_dict(
-            nut_data_raw, is_metric=self._is_metric
+        nut_data = evaluate_parameter_dict(
+            nut_data_raw, is_metric=_is_metric
         )
-        BasePart.__init__(self)
+
+        BasePart.__init__(self, nut_data=nut_data)
+        object.__setattr__(self, "_nut_size", _nut_size)
+        object.__setattr__(self, "_thread_size", _thread_size)
+        object.__setattr__(self, "_length_size", _length_size)
+        object.__setattr__(self, "_is_metric", _is_metric)
+        object.__setattr__(self, "_thread_diameter", _thread_diameter)
+        object.__setattr__(self, "_thread_pitch", _thread_pitch)
+        object.__setattr__(self, "_fastener_type", fastener_type)
+        object.__setattr__(self, "_hand", hand)
+        object.__setattr__(self, "_simple", simple)
+        object.__setattr__(self, "socket_clearance", 6.0)
+        self._build_geometry()
+
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
+
+
+
+    def _build_geometry(self) -> None:
+        self.geom = self._make_nut()
+
     def nut_profile(self) -> Face:
         """Not used by HeatSetNut — stub to satisfy ABC."""
         pass  # pragma: no cover
@@ -1020,14 +1075,30 @@ class Screw(BasePart, ABC):
         fastener_type: type identifier, e.g. ``"iso4762"``.
         hand: ``"right"`` (default) or ``"left"``.
         simple: if ``True`` (default), omit helical thread geometry.
-        socket_clearance: extra radial clearance for socket wrench (mm).
-
-    Raises:
-        ValueError: invalid *size*, *fastener_type*, or *hand*.
     """
+    # ── Pydantic fields (required by __init__) ──────────────────────
+    _screw_size: str = ""
+    _thread_size: str = ""
+    _length_size: str = ""
+    _is_metric: bool = True
+    _thread_diameter: float = 0.0
+    _thread_pitch: float = 0.0
+    _fastener_type: str = ""
+    _hand: str = "right"
+    _simple: bool = True
+    _length: float = 0.0
+    _max_thread_length: float = 0.0
+    _thread_length: float = 0.0
+    _head_height: float = 0.0
+    _head_diameter: float = 0.0
+    socket_clearance: float = 6.0
+    screw_data: dict = Field(default_factory=dict)
+    hole_locations: list = Field(default_factory=list)
+    label: str = ""
+    color: object = None
 
+    # ── class-level CSV-derived data ────────────────────────────────
     fastener_data: ClassVar[dict[str, dict[str, str]]]
-
     clearance_hole_drill_sizes: ClassVar[dict] = {}
     clearance_hole_data: ClassVar[dict] = {}
     tap_hole_drill_sizes: ClassVar[dict] = {}
@@ -1233,49 +1304,65 @@ class Screw(BasePart, ABC):
     ):
         self._load_hole_tables()
 
-        self._screw_size = size.strip()
+        _screw_size = size.strip()
         (
-            self._thread_size,
-            self._length_size,
-            self._is_metric,
-            self._thread_diameter,
-            self._thread_pitch,
-        ) = _parse_size(self._screw_size)
+            _thread_size,
+            _length_size,
+            _is_metric,
+            _thread_diameter,
+            _thread_pitch,
+        ) = _parse_size(_screw_size)
 
-        self._length = float(length)
+        _length = float(length)
 
         if fastener_type not in self.types():
             raise ValueError(
                 f"{fastener_type} invalid, must be one of {self.types()}"
             )
-        self._fastener_type = fastener_type
 
         if hand not in ("right", "left"):
             raise ValueError(f"{hand} invalid, must be one of 'right' or 'left'")
-        self._hand = hand
 
-        self._simple = simple
-        self.socket_clearance = socket_clearance
-        self.hole_locations: list[Location] = []
-
-        isolated = isolate_fastener_type(self._fastener_type, self.fastener_data)
-        if self._thread_size not in isolated:
+        isolated = isolate_fastener_type(fastener_type, self.fastener_data)
+        if _thread_size not in isolated:
             raise ValueError(
-                f"{size!r} invalid, must be one of {self.sizes(self._fastener_type)}"
+                f"{size!r} invalid, must be one of {self.sizes(fastener_type)}"
             )
-        self.screw_data = evaluate_parameter_dict(
-            isolated[self._thread_size], is_metric=self._is_metric
+        screw_data = evaluate_parameter_dict(
+            isolated[_thread_size], is_metric=_is_metric
         )
 
         length_offset = self.length_offset()
-        if length_offset >= self._length:
+        if length_offset >= _length:
             raise ValueError(
-                f"Screw length {self._length} is <= countersunk head {length_offset}"
+                f"Screw length {_length} is <= countersunk head {length_offset}"
             )
-        self._max_thread_length = self._length - length_offset
-        self._thread_length = self._length - length_offset
+        _max_thread_length = _length - length_offset
+        _thread_length = _length - length_offset
 
-        super().__init__()
+        super().__init__(
+            screw_data=screw_data,
+            hole_locations=[],
+        )
+        object.__setattr__(self, "_screw_size", _screw_size)
+        object.__setattr__(self, "_thread_size", _thread_size)
+        object.__setattr__(self, "_length_size", _length_size)
+        object.__setattr__(self, "_is_metric", _is_metric)
+        object.__setattr__(self, "_thread_diameter", _thread_diameter)
+        object.__setattr__(self, "_thread_pitch", _thread_pitch)
+        object.__setattr__(self, "_length", _length)
+        object.__setattr__(self, "_fastener_type", fastener_type)
+        object.__setattr__(self, "_hand", hand)
+        object.__setattr__(self, "_simple", simple)
+        object.__setattr__(self, "socket_clearance", socket_clearance)
+        object.__setattr__(self, "_max_thread_length", _max_thread_length)
+        object.__setattr__(self, "_thread_length", _thread_length)
+        self._build_geometry()
+
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
+
 
     def _build_geometry(self) -> None:
         head = self._make_head()
@@ -1302,6 +1389,8 @@ class Screw(BasePart, ABC):
             screw = self.custom_make()  # type: ignore[attr-defined]
         elif head is not None:
             screw = head.fuse(shank)
+            if hasattr(screw, '__iter__'):  # Handle ShapeList from failed boolean
+                screw = next(iter(screw))
         else:
             screw = shank
 
@@ -1321,7 +1410,7 @@ class Screw(BasePart, ABC):
             f"({self._screw_size}, {self._length:0.2f}, {self._fastener_type})"
         )
         self.color = Color(0xC0C0C0)
-        RigidJoint("a", self, Location())
+        self.joints["a"] = RigidJoint("a", self.geom, Location())
 
     def _make_head(self) -> Solid | None:
         """Create screw head from class-defined profile / plan / recess."""
@@ -1439,12 +1528,21 @@ class Washer(BasePart, ABC):
     Raises:
         ValueError: invalid *fastener_type* or *size*.
     """
+    # ── Pydantic fields (required by __init__) ──────────────────────
+    _washer_size: str = ""
+    _thread_size: str = ""
+    _is_metric: bool = True
+    _thread_diameter: float = 0.0
+    _fastener_type: str = ""
+    washer_data: dict = Field(default_factory=dict)
+    hole_locations: list = Field(default_factory=list)
+    label: str = ""
+    color: object = None
 
+    # ── class-level CSV-derived data ────────────────────────────────
     fastener_data: ClassVar[dict[str, dict[str, str]]]
-
     clearance_hole_drill_sizes: ClassVar[dict] = {}
     clearance_hole_data: ClassVar[dict] = {}
-
     @classmethod
     def _load_hole_tables(cls) -> None:
         if not cls.clearance_hole_drill_sizes:
@@ -1546,33 +1644,43 @@ class Washer(BasePart, ABC):
     ):
         self._load_hole_tables()
 
-        self._washer_size = size.strip()
-        self._thread_size = size.strip()
-        self._is_metric = self._thread_size.startswith("M")
+        _washer_size = size.strip()
+        _thread_size = size.strip()
+        _is_metric = _thread_size.startswith("M")
 
-        if self._is_metric:
-            self._thread_diameter = float(size[1:])
+        if _is_metric:
+            _thread_diameter = float(size[1:])
         else:
-            self._thread_diameter = imperial_str_to_float(size)
+            _thread_diameter = imperial_str_to_float(size)
 
         if fastener_type not in self.types():
             raise ValueError(
                 f"{fastener_type} invalid, must be one of {self.types()}"
             )
-        self._fastener_type = fastener_type
 
-        isolated = isolate_fastener_type(self._fastener_type, self.fastener_data)
-        if self._thread_size not in isolated:
+        isolated = isolate_fastener_type(fastener_type, self.fastener_data)
+        if _thread_size not in isolated:
             raise ValueError(
-                f"{size!r} invalid, must be one of {self.sizes(self._fastener_type)}"
+                f"{size!r} invalid, must be one of {self.sizes(fastener_type)}"
             )
-        self.washer_data = evaluate_parameter_dict(
-            isolated[self._thread_size], is_metric=self._is_metric
+        washer_data = evaluate_parameter_dict(
+            isolated[_thread_size], is_metric=_is_metric
         )
 
-        self.hole_locations: list[Location] = []
+        super().__init__(
+            washer_data=washer_data,
+            hole_locations=[],
+        )
+        object.__setattr__(self, "_washer_size", _washer_size)
+        object.__setattr__(self, "_thread_size", _thread_size)
+        object.__setattr__(self, "_is_metric", _is_metric)
+        object.__setattr__(self, "_thread_diameter", _thread_diameter)
+        object.__setattr__(self, "_fastener_type", fastener_type)
+        self._build_geometry()
 
-        super().__init__()
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
 
     def _build_geometry(self) -> None:
         washer = revolve(self.washer_profile()).solid()
@@ -1581,9 +1689,8 @@ class Washer(BasePart, ABC):
             f"{self.__class__.__name__}({self._washer_size}, {self._fastener_type})"
         )
         self.color = Color(0xC0C0C0)
-        RigidJoint("a", self, Location())
-        RigidJoint("b", self, Pos(Z=self.washer_thickness))
-
+        self.joints["a"] = RigidJoint("a", self.geom, Location())
+        self.joints["b"] = RigidJoint("b", self.geom, Pos(Z=self.washer_thickness))
 
 # ═══════════════════════════════════════════════════════════════════════
 # PlainWasher
@@ -1721,6 +1828,15 @@ class ClearanceHole(BasePart):
         captive_nut: create a rectangular filleted recess for captive nuts
             (default ``False``).
     """
+    # ── Pydantic fields ─────────────────────────────────────────────
+    _fastener: Nut | Screw = None  # type: ignore[assignment]
+    _fit: str = "Normal"
+    _depth: float | None = None
+    _counter_sunk: bool = True
+    _captive_nut: bool = False
+    hole_depth: float = 0.0
+    label: str = ""
+    color: object = None
 
     def __init__(
         self,
@@ -1730,12 +1846,6 @@ class ClearanceHole(BasePart):
         counter_sunk: bool = True,
         captive_nut: bool = False,
     ):
-        self._fastener = fastener
-        self._fit = fit
-        self._depth = depth
-        self._counter_sunk = counter_sunk
-        self._captive_nut = captive_nut
-
         if isinstance(fastener, HeatSetNut):
             raise ValueError(
                 "ClearanceHole doesn't accept HeatSetNut — use InsertHole instead"
@@ -1745,12 +1855,22 @@ class ClearanceHole(BasePart):
 
         # Resolve depth
         if depth is not None:
-            self.hole_depth = depth
+            hole_depth = depth
         else:
             # When no BuildPart context, default to 10 × thread diameter
-            self.hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
+            hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
 
-        super().__init__()
+        super().__init__(hole_depth=hole_depth)
+        object.__setattr__(self, "_fastener", fastener)
+        object.__setattr__(self, "_fit", fit)
+        object.__setattr__(self, "_depth", depth)
+        object.__setattr__(self, "_counter_sunk", counter_sunk)
+        object.__setattr__(self, "_captive_nut", captive_nut)
+        self._build_geometry()
+
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
 
     def _build_geometry(self) -> None:
         cs_profile = self._fastener.countersink_profile(self._fit)  # type: ignore[call-arg]
@@ -1782,7 +1902,15 @@ class TapHole(BasePart):
         depth: hole depth; ``None`` = through-part.
         counter_sunk: include countersink recess (default ``True``).
     """
-
+    # ── Pydantic fields ─────────────────────────────────────────────
+    _fastener: Nut | Screw = None  # type: ignore[assignment]
+    _material: str = "Soft"
+    _fit: str = "Normal"
+    _depth: float | None = None
+    _counter_sunk: bool = True
+    hole_depth: float = 0.0
+    label: str = ""
+    color: object = None
     def __init__(
         self,
         fastener: Nut | Screw,
@@ -1791,23 +1919,27 @@ class TapHole(BasePart):
         depth: float | None = None,
         counter_sunk: bool = True,
     ):
-        self._fastener = fastener
-        self._material = material
-        self._fit = fit
-        self._depth = depth
-        self._counter_sunk = counter_sunk
-
         if isinstance(fastener, HeatSetNut):
             raise ValueError(
                 "TapHole doesn't accept HeatSetNut — use InsertHole instead"
             )
 
         if depth is not None:
-            self.hole_depth = depth
+            hole_depth = depth
         else:
-            self.hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
+            hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
 
-        super().__init__()
+        super().__init__(hole_depth=hole_depth)
+        object.__setattr__(self, "_fastener", fastener)
+        object.__setattr__(self, "_material", material)
+        object.__setattr__(self, "_fit", fit)
+        object.__setattr__(self, "_depth", depth)
+        object.__setattr__(self, "_counter_sunk", counter_sunk)
+        self._build_geometry()
+
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
 
     def _build_geometry(self) -> None:
         cs_profile = self._fastener.countersink_profile(self._fit)  # type: ignore[call-arg]
@@ -1823,12 +1955,6 @@ class TapHole(BasePart):
         self.geom = hole_part
         self.label = f"TapHole({self._fastener.info})"
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# ThreadedHole
-# ═══════════════════════════════════════════════════════════════════════
-
-
 class ThreadedHole(BasePart):
     """Clearance hole annotated for threaded insert.
 
@@ -1843,6 +1969,18 @@ class ThreadedHole(BasePart):
         counter_sunk: include countersink recess (default ``True``).
         simple: if ``True`` (default), skip thread annotation.
     """
+    # ── Pydantic fields ─────────────────────────────────────────────
+    _fastener: Nut | Screw = None  # type: ignore[assignment]
+    _material: str = "Soft"
+    _fit: str = "Normal"
+    _depth: float | None = None
+    _counter_sunk: bool = True
+
+    _simple: bool = True
+    hole_depth: float = 0.0
+    label: str = ""
+    color: object = None
+
 
     def __init__(
         self,
@@ -1853,24 +1991,28 @@ class ThreadedHole(BasePart):
         counter_sunk: bool = True,
         simple: bool = True,
     ):
-        self._fastener = fastener
-        self._material = material
-        self._fit = fit
-        self._depth = depth
-        self._counter_sunk = counter_sunk
-        self._simple = simple
-
         if isinstance(fastener, HeatSetNut):
             raise ValueError(
                 "ThreadedHole doesn't accept HeatSetNut — use InsertHole instead"
             )
 
         if depth is not None:
-            self.hole_depth = depth
+            hole_depth = depth
         else:
-            self.hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
+            hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
 
-        super().__init__()
+        super().__init__(hole_depth=hole_depth)
+        object.__setattr__(self, "_fastener", fastener)
+        object.__setattr__(self, "_material", material)
+        object.__setattr__(self, "_fit", fit)
+        object.__setattr__(self, "_depth", depth)
+        object.__setattr__(self, "_counter_sunk", counter_sunk)
+        object.__setattr__(self, "_simple", simple)
+        self._build_geometry()
+
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
 
     def _build_geometry(self) -> None:
         cs_profile = self._fastener.countersink_profile(self._fit)  # type: ignore[call-arg]
@@ -1907,7 +2049,15 @@ class InsertHole(BasePart):
         manufacturing_compensation: radial compensation for 3D printer
             over-extrusion (mm, default 0.0).
     """
+    # ── Pydantic fields ─────────────────────────────────────────────
+    _fastener: HeatSetNut = None  # type: ignore[assignment]
+    _fit: str = "Normal"
+    _depth: float | None = None
+    _manufacturing_compensation: float = 0.0
 
+    hole_depth: float = 0.0
+    label: str = ""
+    color: object = None
     def __init__(
         self,
         fastener: HeatSetNut,
@@ -1915,17 +2065,21 @@ class InsertHole(BasePart):
         depth: float | None = None,
         manufacturing_compensation: float = 0.0,
     ):
-        self._fastener = fastener
-        self._fit = fit
-        self._depth = depth
-        self._manufacturing_compensation = manufacturing_compensation
-
         if depth is not None:
-            self.hole_depth = depth
+            hole_depth = depth
         else:
-            self.hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
+            hole_depth = 10 * getattr(fastener, "_thread_diameter", 5.0)
 
-        super().__init__()
+        super().__init__(hole_depth=hole_depth)
+        object.__setattr__(self, "_fastener", fastener)
+        object.__setattr__(self, "_fit", fit)
+        object.__setattr__(self, "_depth", depth)
+        object.__setattr__(self, "_manufacturing_compensation", manufacturing_compensation)
+        self._build_geometry()
+
+    def model_post_init(self, __context: object) -> None:
+        """Override to skip auto-build — we call _build_geometry manually in __init__."""
+        pass
 
     def _build_geometry(self) -> None:
         cs_profile = self._fastener.countersink_profile(

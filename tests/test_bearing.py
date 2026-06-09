@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from proteus.components.bearing import (
     Bearing,
     SingleRowCappedDeepGrooveBallBearing,
@@ -43,7 +42,6 @@ class TestSingleRowDeepGrooveBallBearing:
         assert bbox.size.Y > 0
         assert bbox.size.Z > 0
 
-    @pytest.mark.xfail(reason="Bearing port missing info/clearance_hole_diameters properties")
     def test_info(self):
         """Test info property."""
         bearing = SingleRowDeepGrooveBallBearing(
@@ -52,7 +50,6 @@ class TestSingleRowDeepGrooveBallBearing:
         )
         assert len(bearing.info) > 2
 
-    @pytest.mark.xfail(reason="Bearing port missing clearance_hole_diameters property")
     def test_clearance_hole_diameters(self):
         """Test clearance hole diameters property."""
         bearing = SingleRowDeepGrooveBallBearing(
@@ -74,7 +71,6 @@ class TestSingleRowCappedDeepGrooveBallBearing:
         assert bearing.geom is not None
         assert bearing.geom.volume > 0
 
-    @pytest.mark.xfail(reason="Bearing port missing capped property")
     def test_capped(self):
         """Test that capped bearings have caps."""
         bearing = SingleRowCappedDeepGrooveBallBearing(

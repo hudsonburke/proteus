@@ -184,7 +184,9 @@ class SpurGearPlan(BaseSketch):
         gear_face = bd.Face(gear_wire)
         if gear_face.normal_at().Z < 0:
             gear_face = -gear_face
-        self.geom = bd.Sketch(gear_face)
+        with bd.BuildSketch() as sketch:
+            bd.add(gear_face)
+        self.geom = sketch.sketch
 
 
 class SpurGear(BasePart):

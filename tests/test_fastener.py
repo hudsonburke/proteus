@@ -21,7 +21,6 @@ from proteus.components.fastener import (
 class TestHexNut:
     """Test HexNut class."""
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_creation(self):
         """Test basic HexNut creation."""
         nut = HexNut(
@@ -47,7 +46,6 @@ class TestHexNut:
                 fastener_type="invalid",
             )
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_joints(self):
         """Test joints exist."""
         nut = HexNut(
@@ -60,7 +58,6 @@ class TestHexNut:
 class TestSocketHeadCapScrew:
     """Test SocketHeadCapScrew class."""
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_creation(self):
         """Test basic SocketHeadCapScrew creation."""
         screw = SocketHeadCapScrew(
@@ -71,7 +68,6 @@ class TestSocketHeadCapScrew:
         assert screw.geom is not None
         assert screw.geom.volume > 0
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_joints(self):
         """Test joints exist."""
         screw = SocketHeadCapScrew(
@@ -85,11 +81,10 @@ class TestSocketHeadCapScrew:
 class TestPlainWasher:
     """Test PlainWasher class."""
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_creation(self):
         """Test basic PlainWasher creation."""
         washer = PlainWasher(
-            size="M6-1",
+            size="M6",
             fastener_type="iso7089",
         )
         assert washer.geom is not None
@@ -99,11 +94,10 @@ class TestPlainWasher:
 class TestHeatSetNut:
     """Test HeatSetNut class."""
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_creation(self):
         """Test basic HeatSetNut creation."""
         nut = HeatSetNut(
-            size="M3-0.5",
+            size="M3-0.5-Standard",
             fastener_type="McMaster-Carr",
         )
         assert nut.geom is not None
@@ -113,7 +107,6 @@ class TestHeatSetNut:
 class TestHoleHelpers:
     """Test hole helper classes."""
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_clearance_hole(self):
         """Test ClearanceHole creation."""
         screw = SocketHeadCapScrew(
@@ -128,7 +121,6 @@ class TestHoleHelpers:
         assert hole.geom is not None
         assert hole.geom.volume > 0
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_tap_hole(self):
         """Test TapHole creation."""
         screw = SocketHeadCapScrew(
@@ -143,7 +135,6 @@ class TestHoleHelpers:
         assert hole.geom is not None
         assert hole.geom.volume > 0
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_threaded_hole(self):
         """Test ThreadedHole creation."""
         screw = SocketHeadCapScrew(
@@ -158,11 +149,10 @@ class TestHoleHelpers:
         assert hole.geom is not None
         assert hole.geom.volume > 0
 
-    @pytest.mark.xfail(reason="Fastener port has CSV parsing and field assignment issues")
     def test_insert_hole(self):
         """Test InsertHole creation."""
         nut = HeatSetNut(
-            size="M3-0.5",
+            size="M3-0.5-Standard",
             fastener_type="McMaster-Carr",
         )
         hole = InsertHole(
