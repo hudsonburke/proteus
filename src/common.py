@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Self, TYPE_CHECKING, TypeAlias, cast
-
+from typing import Annotated, ClassVar, TYPE_CHECKING, TypeAlias, cast, Any
+from abc import ABC, abstractmethod
 import build123d as bd
 import pint
 from pint.facets.plain import PlainQuantity
@@ -12,7 +12,6 @@ from pydantic import (
     Field,
     InstanceOf,
     PlainSerializer,
-    model_validator,
 )
 
 ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
@@ -84,24 +83,20 @@ else:
     ]
 
 
-class BasePart(BaseModel):
+class BasePart(BaseModel, ABC):
     model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
 
     geom: bd.Part | None = Field(default=None, exclude=True)
     joints: dict[str, bd.Joint] = Field(default_factory=dict, exclude=True)
 
+    @abstractmethod
     def _build_geometry(self) -> None:
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _build_geometry()."
-        )
+        pass
 
-    @model_validator(mode="after")
-    def _finalize_geometry(self) -> Self:
+    def model_post_init(self, __context: Any) -> None:
         self._build_geometry()
 
         if self.geom is None:
             raise ValueError(
                 f"{self.__class__.__name__}._build_geometry() did not set self.geom"
             )
-
-        return self
