@@ -10,3 +10,6 @@ dependencies = [
   "pint>=0.25.3",
   "pydantic>=2.13.4",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8.0.0"]
