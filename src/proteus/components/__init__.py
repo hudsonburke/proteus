@@ -1,3 +1,19 @@
 """Component-level parametric CAD objects."""
 
-__all__: list[str] = []
+from proteus.components.thread import (
+    AcmeThread,
+    IsoThread,
+    MetricTrapezoidalThread,
+    PlasticBottleThread,
+    Thread,
+    TrapezoidalThread,
+)
+
+__all__: list[str] = [
+    "AcmeThread",
+    "IsoThread",
+    "MetricTrapezoidalThread",
+    "PlasticBottleThread",
+    "Thread",
+    "TrapezoidalThread",
+]
