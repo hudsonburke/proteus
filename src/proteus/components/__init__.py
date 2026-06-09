@@ -1,8 +1,11 @@
 """Component-level parametric CAD objects."""
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
+from .bearing import (
+    Bearing,
+    SingleRowCappedDeepGrooveBallBearing,
+    SingleRowDeepGrooveBallBearing,
+    SingleRowTaperedRollerBearing,
+)
 from .fastener import (
     ClearanceHole,
     HeatSetNut,
@@ -16,6 +19,10 @@ from .fastener import (
     ThreadedHole,
     Washer,
 )
+from .flange import BlindFlange, Flange, SlipOnFlange
+from .gear import InvoluteToothProfile, SpurGear, SpurGearPlan
+from .pipe import Pipe, PipeSection
+from .sprocket import Sprocket
 from .thread import (
     AcmeThread,
     IsoThread,
@@ -27,55 +34,33 @@ from .thread import (
 
 __all__: list[str] = [
     "AcmeThread",
+    "Bearing",
+    "BlindFlange",
     "ClearanceHole",
+    "Flange",
     "HeatSetNut",
     "HexNut",
     "InsertHole",
+    "InvoluteToothProfile",
     "IsoThread",
     "MetricTrapezoidalThread",
     "Nut",
+    "Pipe",
+    "PipeSection",
     "PlainWasher",
     "PlasticBottleThread",
     "Screw",
+    "SingleRowCappedDeepGrooveBallBearing",
+    "SingleRowDeepGrooveBallBearing",
+    "SingleRowTaperedRollerBearing",
+    "SlipOnFlange",
     "SocketHeadCapScrew",
+    "SpurGear",
+    "SpurGearPlan",
+    "Sprocket",
     "TapHole",
     "Thread",
     "ThreadedHole",
     "TrapezoidalThread",
     "Washer",
-=======
-from .bearing import (
-    Bearing,
-    SingleRowCappedDeepGrooveBallBearing,
-    SingleRowDeepGrooveBallBearing,
-    SingleRowTaperedRollerBearing,
-)
-
-__all__: list[str] = [
-    "Bearing",
-    "SingleRowCappedDeepGrooveBallBearing",
-    "SingleRowDeepGrooveBallBearing",
-    "SingleRowTaperedRollerBearing",
->>>>>>> 986a003 (Port core bearing components from bd_warehouse)
-=======
-from .gear import InvoluteToothProfile, SpurGear, SpurGearPlan
-from .sprocket import Sprocket
-
-__all__ = [
-    "InvoluteToothProfile",
-    "Sprocket",
-    "SpurGear",
-    "SpurGearPlan",
->>>>>>> af1fe24 (Port gear and sprocket components from bd_warehouse)
-=======
-from proteus.components.flange import BlindFlange, Flange, SlipOnFlange
-from proteus.components.pipe import Pipe, PipeSection
-
-__all__: list[str] = [
-    "Pipe",
-    "PipeSection",
-    "Flange",
-    "BlindFlange",
-    "SlipOnFlange",
->>>>>>> 3d7027d (Port pipe and flange components from bd_warehouse)
 ]
