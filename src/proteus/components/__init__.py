@@ -1,5 +1,6 @@
 """Component-level parametric CAD objects."""
 
+<<<<<<< HEAD
 from .fastener import (
     ClearanceHole,
     HeatSetNut,
@@ -40,4 +41,18 @@ __all__: list[str] = [
     "ThreadedHole",
     "TrapezoidalThread",
     "Washer",
+=======
+from .bearing import (
+    Bearing,
+    SingleRowCappedDeepGrooveBallBearing,
+    SingleRowDeepGrooveBallBearing,
+    SingleRowTaperedRollerBearing,
+)
+
+__all__: list[str] = [
+    "Bearing",
+    "SingleRowCappedDeepGrooveBallBearing",
+    "SingleRowDeepGrooveBallBearing",
+    "SingleRowTaperedRollerBearing",
+>>>>>>> 986a003 (Port core bearing components from bd_warehouse)
 ]
