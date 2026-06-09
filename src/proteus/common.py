@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, TYPE_CHECKING, TypeAlias, cast, Any
+from typing import Annotated, TYPE_CHECKING, TypeAlias, cast, Any
 from abc import ABC, abstractmethod
 import build123d as bd
 import pint
@@ -13,6 +13,26 @@ from pydantic import (
     InstanceOf,
     PlainSerializer,
 )
+
+
+class BasePart(BaseModel, ABC):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    geom: bd.Part | None = Field(default=None, exclude=True)
+    joints: dict[str, bd.Joint] = Field(default_factory=dict, exclude=True)
+
+    @abstractmethod
+    def _build_geometry(self) -> None:
+        pass
+
+    def model_post_init(self, __context: Any) -> None:
+        self._build_geometry()
+
+        if self.geom is None:
+            raise ValueError(
+                f"{self.__class__.__name__}._build_geometry() did not set self.geom"
+            )
+
 
 ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
 
@@ -81,22 +101,3 @@ else:
         PlainSerializer(_dump_quantity, return_type=str),
         Field(validate_default=True),
     ]
-
-
-class BasePart(BaseModel, ABC):
-    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
-
-    geom: bd.Part | None = Field(default=None, exclude=True)
-    joints: dict[str, bd.Joint] = Field(default_factory=dict, exclude=True)
-
-    @abstractmethod
-    def _build_geometry(self) -> None:
-        pass
-
-    def model_post_init(self, __context: Any) -> None:
-        self._build_geometry()
-
-        if self.geom is None:
-            raise ValueError(
-                f"{self.__class__.__name__}._build_geometry() did not set self.geom"
-            )
