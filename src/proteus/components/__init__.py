@@ -2,6 +2,7 @@
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 from .fastener import (
     ClearanceHole,
     HeatSetNut,
@@ -66,4 +67,15 @@ __all__ = [
     "SpurGear",
     "SpurGearPlan",
 >>>>>>> af1fe24 (Port gear and sprocket components from bd_warehouse)
+=======
+from proteus.components.flange import BlindFlange, Flange, SlipOnFlange
+from proteus.components.pipe import Pipe, PipeSection
+
+__all__: list[str] = [
+    "Pipe",
+    "PipeSection",
+    "Flange",
+    "BlindFlange",
+    "SlipOnFlange",
+>>>>>>> 3d7027d (Port pipe and flange components from bd_warehouse)
 ]
