@@ -19,7 +19,7 @@ from typing import ClassVar
 import build123d as bd
 from pydantic import Field
 
-from ..common import BasePart
+from ..common import BasePart, convert
 
 # ---------------------------------------------------------------------------
 # CSV parameter helpers
@@ -92,14 +92,18 @@ def _metric_str_to_float(s: str) -> float:
 
 
 def _imperial_str_to_float(s: str) -> float:
-    """Convert an imperial size string to a float (inches)."""
+    """Convert an imperial size string to a float in mm.
+
+    Parses fractions and known drill/number sizes and returns values converted
+    to the CAD-native unit (mm).
+    """
     s = s.strip()
     if s in ("–", "—", ""):
         return float("nan")
     if s.startswith("#"):
-        return _NUMBER_DRILL_SIZES.get(s, float("nan"))
+        return convert(_NUMBER_DRILL_SIZES.get(s, float("nan")), "in")
     if s in _LETTER_DRILL_SIZES:
-        return _LETTER_DRILL_SIZES[s]
+        return convert(_LETTER_DRILL_SIZES[s], "in")
     parts = s.replace('"', "").split()
     total = 0.0
     for p in parts:
@@ -108,7 +112,7 @@ def _imperial_str_to_float(s: str) -> float:
             total += float(n) / float(d)
         else:
             total += float(p)
-    return total
+    return convert(total, "in")
 
 def _read_csv(filename: str) -> dict[str, dict[str, str]]:
     """Read a parameter CSV and return {Size: {TYPE:param: value, ...}}."""
@@ -623,7 +627,7 @@ class SingleRowTaperedRollerBearing(Bearing):
         """Cage holding the rollers together with the cone."""
         roller_solid = self._roller_obj
         roller_hole_cutter = bd.offset(
-            roller_solid, 0.25 * bd.MM, kind=bd.Kind.INTERSECTION
+            roller_solid, convert(0.25, "mm"), kind=bd.Kind.INTERSECTION
         ).move(bd.Pos(X=self._race_center_radius))
 
         roller_max_r = (
@@ -647,7 +651,7 @@ class SingleRowTaperedRollerBearing(Bearing):
         hook = bd.JernArc(
             cage_side @ bottom,
             (cage_side % bottom) * hook_sign,
-            3 * bd.MM,
+            convert(3, "mm"),
             80,
         )
         cage_profile = bd.Wire([cage_side, hook])
@@ -655,7 +659,7 @@ class SingleRowTaperedRollerBearing(Bearing):
         cage_surface -= (
             bd.PolarLocations(0, self.roller_count) * roller_hole_cutter
         )
-        cage = bd.Solid.thicken(cage_surface, 0.5 * bd.MM)
+        cage = bd.Solid.thicken(cage_surface, convert(0.5, "mm"))
         cage.color = bd.Color(0x909090)
         return cage
 

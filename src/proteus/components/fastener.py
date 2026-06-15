@@ -100,7 +100,7 @@ from build123d import (
 
 from pydantic import Field
 
-from proteus.common import BasePart
+from proteus.common import BasePart, convert
 
 # ═══════════════════════════════════════════════════════════════════════
 # Resolve data directory relative to this module
@@ -146,7 +146,10 @@ def read_fastener_parameters_from_csv(filename: str) -> dict[str, dict[str, str]
 
 
 def decode_imperial_size(size: str) -> tuple[float, float]:
-    """Extract major diameter and pitch from an imperial size string (e.g. ``"1/4-20"``)."""
+    """Extract major diameter and pitch from an imperial size string (e.g. ``"1/4-20"``).
+
+    Returns values converted to the CAD-native unit (mm).
+    """
     size_parts = size.split("-")
     if len(size_parts) != 2:
         raise ValueError(f"Imperial size {size} not in diameter-TPI format")
@@ -161,9 +164,7 @@ def decode_imperial_size(size: str) -> tuple[float, float]:
     else:
         diameter = float(diameter_str)
     pitch = 1 / tpi
-    return (diameter, pitch)
-
-
+    return (convert(diameter, "in"), convert(pitch, "in"))
 def metric_str_to_float(measure: str) -> float | str:
     """Convert a metric measurement string to float or str, stripping trailing units.
 
@@ -279,7 +280,7 @@ def is_safe(value: str) -> bool:
 
 
 def imperial_str_to_float(measure: str) -> float:
-    """Convert an imperial measurement string (possibly a fraction) to float.
+    """Convert an imperial measurement string (possibly a fraction) to float in mm.
 
     Handles number/letter drill sizes by looking them up in drill_sizes.csv.
     """
@@ -290,18 +291,18 @@ def imperial_str_to_float(measure: str) -> float:
     # Handle drill sizes (e.g., "#51", "B")
     drill_sizes = read_drill_sizes()
     if measure in drill_sizes:
-        return drill_sizes[measure]
+        return convert(drill_sizes[measure], "in")
 
     if "/" in measure:
         parts = measure.split()
         if len(parts) == 2 and is_safe(parts[0]) and is_safe(parts[1]):
             whole = float(parts[0])
             num, denom = parts[1].split("/")
-            return whole + float(num) / float(denom)
+            return convert(whole + float(num) / float(denom), "in")
         elif len(parts) == 1 and is_safe(measure):
             num, denom = measure.split("/")
-            return float(num) / float(denom)
-    return float(measure)
+            return convert(float(num) / float(denom), "in")
+    return convert(float(measure), "in")
 
 
 def select_by_size_fn(cls, size: str) -> dict:

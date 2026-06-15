@@ -9,7 +9,7 @@ from typing import Literal
 
 import build123d as bd
 
-from proteus.common import BasePart
+from proteus.common import BasePart, convert
 from proteus.components.pipe import Nps as PipeNps
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -23,9 +23,9 @@ def _is_safe(value: str) -> bool:
 def _imperial_str_to_float(measure: str) -> float:
     """Convert an imperial measurement string (possibly a fraction) to mm."""
     if _is_safe(measure):
-        result = eval(measure.strip().replace(" ", "+")) * bd.IN  # noqa: S307
+        result = convert(eval(measure.strip().replace(" ", "+")), "in")  # noqa: S307
     else:
-        result = float(measure) * bd.IN
+        result = convert(float(measure), "in")
     return result
 
 
@@ -472,7 +472,7 @@ class SlipOnFlange(Flange):
             flange_profile.sketch, W, n, d
         )
         self.joints["pipe"] = bd.RigidJoint(
-            "pipe", self.geom, bd.Location(bd.Plane.YX.offset(-(1 / 16) * bd.IN))
+            "pipe", self.geom, bd.Location(bd.Plane.YX.offset(-convert(1 / 16, "in")))
         )
         self.joints["face"] = bd.RigidJoint(
             "face", self.geom, bd.Location(bd.Plane.XY)

@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Annotated, TYPE_CHECKING, TypeAlias, Any, cast
+from typing import Any
 
 import build123d as bd
 import pint
-from pint.facets.plain import PlainQuantity
 from pydantic import (
     BaseModel,
-    BeforeValidator,
     ConfigDict,
     Field,
-    InstanceOf,
-    PlainSerializer,
 )
 
 
@@ -21,6 +17,12 @@ class BaseObject(BaseModel, ABC):
 
     Use this for shared validation, serialization, and quantity-backed inputs when a
     model does not yet need to commit to a specific build123d geometry kind.
+
+    Note:
+        build123d natively uses **millimetres (mm)** for lengths and **degrees**
+        for angles.  All numeric fields in subclasses should store values in these
+        units.  Use :func:`convert` to translate quantities from other units into
+        the CAD-native unit.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -95,70 +97,24 @@ class BaseCurve(BaseGeometry, ABC):
     geom: bd.Curve | bd.Wire | bd.Edge | None = Field(default=None, exclude=True)
 
 
-ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
-
-Quantity: TypeAlias = PlainQuantity[float]
-QuantityInput: TypeAlias = Quantity | str | float | int
+_ureg = pint.UnitRegistry[float]()
 
 
-def _quantity(value: str | float | int, unit: str | None = None) -> Quantity:
-    return cast(Quantity, ureg.Quantity(value, unit))
+def convert(value: float, unit: str) -> float:
+    """Convert a physical quantity to the CAD-native unit.
 
+    Lengths → mm.  Angles → degrees.
 
-def _to_unit(value: Quantity, unit: str) -> Quantity:
-    return value.to(unit)  # pyright: ignore[reportUnknownMemberType]
-
-
-def _dump_quantity(value: Quantity) -> str:
-    return str(value)
-
-
-def parse_quantity(value: object, default_unit: str) -> Quantity:
-    if isinstance(value, bool):
-        raise TypeError("Cannot parse bool into a physical quantity.")
-
-    if isinstance(value, PlainQuantity):
-        return _to_unit(cast(Quantity, value), default_unit)
-
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            raise ValueError("Cannot parse an empty quantity string.")
-
-        try:
-            return _to_unit(_quantity(stripped), default_unit)
-        except pint.DimensionalityError:
-            return _quantity(float(stripped), default_unit)
-
-    if isinstance(value, int | float):
-        return _quantity(float(value), default_unit)
-
-    raise TypeError(f"Cannot parse {type(value)} into a physical quantity.")
-
-
-def _parse_length_mm(value: object) -> Quantity:
-    return parse_quantity(value, "mm")
-
-
-def _parse_angle_deg(value: object) -> Quantity:
-    return parse_quantity(value, "deg")
-
-
-# Static type checkers model the accepted constructor/default inputs.
-# Pydantic stores a Pint Quantity at runtime after the BeforeValidator runs.
-if TYPE_CHECKING:
-    LengthMM: TypeAlias = QuantityInput
-    AngleDeg: TypeAlias = QuantityInput
-else:
-    LengthMM: TypeAlias = Annotated[
-        InstanceOf[PlainQuantity],
-        BeforeValidator(_parse_length_mm),
-        PlainSerializer(_dump_quantity, return_type=str),
-        Field(validate_default=True),
-    ]
-    AngleDeg: TypeAlias = Annotated[
-        InstanceOf[PlainQuantity],
-        BeforeValidator(_parse_angle_deg),
-        PlainSerializer(_dump_quantity, return_type=str),
-        Field(validate_default=True),
-    ]
+    >>> convert(124, "in")
+    3149.6
+    >>> convert(1.57, "rad")
+    89.95...
+    >>> convert(90, "deg")
+    90.0
+    """
+    q = _ureg.Quantity(value, unit)
+    if q.check("[length]"):
+        return q.to(_ureg.mm).magnitude
+    if q.check("[angle]"):
+        return q.to(_ureg.degrees).magnitude
+    raise ValueError(f"Unsupported unit dimension: {q.dimensionality}")

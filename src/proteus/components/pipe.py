@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 
 import build123d as bd
 
-from proteus.common import BasePart, BaseSketch
+from proteus.common import BasePart, BaseSketch, convert
 
 # ── Type aliases ────────────────────────────────────────────────────────
 Nps = Literal[
@@ -76,8 +76,8 @@ class PipeSection(BaseSketch):
                 f"material={self.material!r}, identifier={self.identifier!r}"
             ) from None
 
-        self.od = od_in * bd.IN
-        self.thickness = thickness_in * bd.IN
+        self.od = convert(od_in, "in")
+        self.thickness = convert(thickness_in, "in")
         self.id = self.od - 2 * self.thickness
 
         with bd.BuildSketch() as cross_section:

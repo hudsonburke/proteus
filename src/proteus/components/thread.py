@@ -14,7 +14,7 @@ from math import copysign, radians, tan
 
 import build123d as bd
 
-from proteus.common import BasePart
+from proteus.common import BasePart, convert
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -30,9 +30,9 @@ def _imperial_str_to_float(measure: str) -> float:
     """Convert an imperial measurement (possibly a fraction) to a float in mm."""
     if _is_safe(measure):
         # The string is verified as safe before eval() is called.
-        result = eval(measure.strip().replace(" ", "+")) * bd.IN  # noqa: S307
+        result = convert(eval(measure.strip().replace(" ", "+")), "in")  # noqa: S307
     else:
-        result = float(measure)
+        result = convert(float(measure), "in")
     return result
 
 
@@ -473,20 +473,20 @@ class AcmeThread(BasePart):
     """ACME thread (29° trapezoidal, imperial sizes)."""
 
     _acme_pitch: ClassVar[dict[str, float]] = {
-        "1/4": (1 / 16) * bd.IN,
-        "5/16": (1 / 14) * bd.IN,
-        "3/8": (1 / 12) * bd.IN,
-        "1/2": (1 / 10) * bd.IN,
-        "5/8": (1 / 8) * bd.IN,
-        "3/4": (1 / 6) * bd.IN,
-        "7/8": (1 / 6) * bd.IN,
-        "1": (1 / 5) * bd.IN,
-        "1 1/4": (1 / 5) * bd.IN,
-        "1 1/2": (1 / 4) * bd.IN,
-        "1 3/4": (1 / 4) * bd.IN,
-        "2": (1 / 4) * bd.IN,
-        "2 1/2": (1 / 3) * bd.IN,
-        "3": (1 / 2) * bd.IN,
+        "1/4": convert(1 / 16, "in"),
+        "5/16": convert(1 / 14, "in"),
+        "3/8": convert(1 / 12, "in"),
+        "1/2": convert(1 / 10, "in"),
+        "5/8": convert(1 / 8, "in"),
+        "3/4": convert(1 / 6, "in"),
+        "7/8": convert(1 / 6, "in"),
+        "1": convert(1 / 5, "in"),
+        "1 1/4": convert(1 / 5, "in"),
+        "1 1/2": convert(1 / 4, "in"),
+        "1 3/4": convert(1 / 4, "in"),
+        "2": convert(1 / 4, "in"),
+        "2 1/2": convert(1 / 3, "in"),
+        "3": convert(1 / 2, "in"),
     }
 
     thread_angle: float = 29.0
@@ -779,7 +779,7 @@ class PlasticBottleThread(BasePart):
         if not self.external:
             apex_offset = -apex_offset
 
-        pitch = 25.4 * bd.MM / tpi
+        pitch = convert(1, "in") / tpi
         length = (self._finish_data[finish][0] + 0.75) * pitch
 
         inner = Thread(
