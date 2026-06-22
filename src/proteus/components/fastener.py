@@ -100,7 +100,8 @@ from build123d import (
 
 from pydantic import Field
 
-from proteus.common import BasePart, convert
+from proteus.common import BasePart
+from proteus.units import convert
 
 # ═══════════════════════════════════════════════════════════════════════
 # Resolve data directory relative to this module

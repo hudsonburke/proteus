@@ -1,5 +1,6 @@
 """Component-level parametric CAD objects."""
 
+from .cuff import Cuff
 from .bearing import (
     Bearing,
     SingleRowCappedDeepGrooveBallBearing,
@@ -33,6 +34,7 @@ from .thread import (
 )
 
 __all__: list[str] = [
+    "Cuff",
     "AcmeThread",
     "Bearing",
     "BlindFlange",

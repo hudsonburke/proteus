@@ -3,7 +3,7 @@ name = "proteus"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
   "bd-warehouse>=0.2.0",
   "build123d>=0.10.0",
@@ -11,5 +11,13 @@ dependencies = [
   "pydantic>=2.13.4",
 ]
 
+[project.optional-dependencies]
+melos = [
+  "melos-core",
+]
+
 [dependency-groups]
 dev = ["pytest>=8.0.0"]
+
+[tool.uv.sources]
+melos-core = { path = "../../melos/packages/melos-core", editable = true }

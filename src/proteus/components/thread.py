@@ -14,7 +14,8 @@ from math import copysign, radians, tan
 
 import build123d as bd
 
-from proteus.common import BasePart, convert
+from proteus.common import BasePart
+from proteus.units import convert
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -7,8 +7,8 @@ from .common import (
     BaseObject,
     BasePart,
     BaseSketch,
-    convert,
 )
+from .units import convert
 
 __all__ = [
     "BaseAssembly",

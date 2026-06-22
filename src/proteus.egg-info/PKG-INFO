@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: proteus
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: bd-warehouse>=0.2.0
+Requires-Dist: build123d>=0.10.0
+Requires-Dist: pint>=0.25.3
+Requires-Dist: pydantic>=2.13.4
+Provides-Extra: melos
+Requires-Dist: melos-core; extra == "melos"
+
+# proteus
+
+A python package and library for modular and flexible CAD prototyping built on build123d, pydantic, and pint.

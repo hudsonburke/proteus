@@ -19,7 +19,8 @@ from typing import ClassVar
 import build123d as bd
 from pydantic import Field
 
-from ..common import BasePart, convert
+from ..common import BasePart
+from ..units import convert
 
 # ---------------------------------------------------------------------------
 # CSV parameter helpers

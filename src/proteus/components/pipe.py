@@ -10,7 +10,8 @@ from typing import ClassVar, Literal
 
 import build123d as bd
 
-from proteus.common import BasePart, BaseSketch, convert
+from proteus.common import BasePart, BaseSketch
+from proteus.units import convert
 
 # ── Type aliases ────────────────────────────────────────────────────────
 Nps = Literal[

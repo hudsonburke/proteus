@@ -1,0 +1,7 @@
+bd-warehouse>=0.2.0
+build123d>=0.10.0
+pint>=0.25.3
+pydantic>=2.13.4
+
+[melos]
+melos-core

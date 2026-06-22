@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import build123d as bd
-import pint
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -95,26 +94,3 @@ class BaseCurve(BaseGeometry, ABC):
     """
 
     geom: bd.Curve | bd.Wire | bd.Edge | None = Field(default=None, exclude=True)
-
-
-_ureg = pint.UnitRegistry[float]()
-
-
-def convert(value: float, unit: str) -> float:
-    """Convert a physical quantity to the CAD-native unit.
-
-    Lengths → mm.  Angles → degrees.
-
-    >>> convert(124, "in")
-    3149.6
-    >>> convert(1.57, "rad")
-    89.95...
-    >>> convert(90, "deg")
-    90.0
-    """
-    q = _ureg.Quantity(value, unit)
-    if q.check("[length]"):
-        return q.to(_ureg.mm).magnitude
-    if q.check("[angle]"):
-        return q.to(_ureg.degrees).magnitude
-    raise ValueError(f"Unsupported unit dimension: {q.dimensionality}")
