@@ -17,6 +17,8 @@ import build123d as bd
 
 from ..common import BasePart
 
+from ..cli import register_part
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
     from melos.core.retarget.model import SegmentMeasurementSet
 
 
+@register_part("Cuff")
 class Cuff(BasePart):
     """A partial cylindrical cuff that wraps around a limb segment.
 

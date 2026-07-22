@@ -1,0 +1,17 @@
+{
+  "name": "test_upper_arm_cuff",
+  "version": "1.0",
+  "parts": [{
+    "id": "upper_arm_cuff_test",
+    "part_type": "Cuff",
+    "parameters": {
+      "coverage": 0.75,
+      "wall_thickness": 3.0,
+      "padding_thickness": 2.0,
+      "width": 40.0
+    },
+    "measurements": {
+      "upper_arm_length_r": 0.30
+    }
+  }]
+}
