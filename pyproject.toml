@@ -21,6 +21,3 @@ dev = ["pytest>=8.0.0"]
 
 [project.scripts]
 proteus = "proteus.cli:main"
-
-[tool.uv.sources]
-melos-core = { path = "../../melos/packages/melos-core", editable = true }
